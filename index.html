@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ОП — группы «Север», «ЮГ»</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#fff; --ink:#1c2430; --muted:#6b7787;
+    --line:#e3e7ec; --ok:#d92b2b; --pend:#2f6fed; --warn:#b06000;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    font:14px/1.45 -apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    color:var(--ink); background:var(--bg);
+    display:flex; height:100vh; overflow:hidden;
+  }
+  #side{width:400px; flex:0 0 400px; background:var(--panel);
+        border-right:1px solid var(--line); display:flex; flex-direction:column}
+  #side header{padding:15px 18px 12px; border-bottom:1px solid var(--line)}
+  #side h1{margin:0 0 3px; font-size:16px; letter-spacing:-.01em}
+  #side .sub{color:var(--muted); font-size:12px}
+  #side .sub a{color:var(--muted)}
+  #count{margin-top:9px; font-size:12.5px; font-weight:600; color:var(--ok)}
+  #count span{font-weight:400; color:var(--muted)}
+  .row{display:flex; gap:6px 13px; margin-top:8px; font-size:12px; flex-wrap:wrap;
+       align-items:center}
+  .row label{display:flex; align-items:center; gap:5px; cursor:pointer; user-select:none}
+  .row .lg{display:flex; align-items:center; gap:5px; color:var(--muted)}
+  .row .cap{color:var(--muted); font-size:11px; letter-spacing:.05em;
+            text-transform:uppercase; font-weight:600; flex:0 0 100%}
+  .swv{width:11px;height:11px;border-radius:50%;display:inline-block;background:var(--ok)}
+  .swp{width:11px;height:11px;border-radius:50%;display:inline-block;background:var(--pend)}
+  #list{overflow:auto; padding:8px 10px 24px; flex:1}
+  .ghdr{margin:16px 8px 2px; font-size:13px; font-weight:700}
+  .ghdr small{font-weight:400; color:var(--muted)}
+  .grp{margin:11px 8px 5px; font-size:11px; letter-spacing:.06em;
+       text-transform:uppercase; color:var(--muted); font-weight:600}
+  .item{display:flex; gap:10px; align-items:flex-start; width:100%; text-align:left;
+        padding:8px 10px; border:0; background:none; border-radius:8px;
+        cursor:pointer; font:inherit; color:inherit}
+  .item:hover{background:#f0f4fb}
+  .item.on{background:#e6eefc}
+  .op{flex:0 0 56px; height:22px; border-radius:11px; color:#fff;
+      font:600 11px/22px sans-serif; text-align:center}
+  .op.v{box-shadow:0 0 0 2px #fde7e7}
+  .item .name{font-weight:600}
+  .item .addr{color:var(--muted); font-size:12.5px}
+  .item .note{display:block; margin-top:3px}
+  .tag{display:inline-block; font-size:10px; font-weight:600; padding:1px 5px;
+       border-radius:4px; background:#eef1f5; color:#4a5666; margin-right:4px;
+       margin-bottom:2px}
+  .tag.ok{background:#fde7e7; color:#a81f1f}
+  .tag.warn{background:#fdf0dd; color:#96601a}
+  #empty{display:none; padding:26px 18px; color:var(--muted); font-size:13px}
+  #map{flex:1; height:100%}
+  .pin{padding:0 6px; min-width:34px; height:22px; border-radius:11px;
+       border:2px solid #fff; box-shadow:0 2px 6px rgba(0,0,0,.35);
+       color:#fff; font:700 11px/18px sans-serif; text-align:center; white-space:nowrap}
+  .pin.v{box-shadow:0 0 0 2.5px rgba(217,43,43,.28), 0 2px 7px rgba(0,0,0,.4)}
+  .pin.q{border-style:dashed}
+  .leaflet-popup-content{font:13.5px/1.5 -apple-system,"Segoe UI",Roboto,Arial,sans-serif; min-width:230px}
+  .leaflet-popup-content b{display:block; font-size:14px; margin-bottom:1px}
+  .leaflet-popup-content .a{color:#6b7787; margin-bottom:7px}
+  .leaflet-popup-content .visited{background:#fde7e7; color:#a81f1f; border-radius:6px;
+       padding:5px 8px; margin-bottom:8px; font-size:12.5px; font-weight:600}
+  .leaflet-popup-content .visited i{display:block; font-style:normal; font-weight:400; color:#8c2b2b}
+  .leaflet-popup-content dl{margin:0; display:grid; grid-template-columns:auto 1fr; gap:3px 10px}
+  .leaflet-popup-content dt{color:#6b7787; font-size:12px}
+  .leaflet-popup-content dd{margin:0; font-size:12.5px}
+  @media (max-width:760px){
+    body{flex-direction:column}
+    #side{width:auto;flex:0 0 48%;border-right:0;border-bottom:1px solid var(--line)}
+  }
+</style>
+</head>
+<body>
+<div id="side">
+  <header>
+    <h1>ОП — группы «Север», «ЮГ»</h1>
+    <div class="sub">37 подразделений · Уфа, с. Иглино, Уфимский район, Чишминский район<br>
+      Объезды — по <a href="https://docs.google.com/spreadsheets/d/1Lxm7dt9CCJtfUkekjqfwfYFQyf1NvG8f/edit?gid=285167481#gid=285167481" target="_blank">таблице учёта</a>, срез 09.09.2026</div>
+    <div id="count"></div>
+    <div class="row" id="rowGroups"><span class="cap">Группа</span></div>
+    <div class="row" id="rowDiv"><span class="cap">Дивизион</span></div>
+    <div class="row">
+      <span class="cap">Статус объезда</span>
+      <span class="lg"><span class="swv"></span>были</span>
+      <span class="lg"><span class="swp"></span>ещё не были</span>
+      <label><input type="checkbox" id="onlyVisited">только те, где были</label>
+    </div>
+  </header>
+  <div id="list"></div>
+  <div id="empty">Ничего не подходит под выбранные фильтры.</div>
+</div>
+<div id="map"></div>
+
+<script>
+var POINTS = [{"op": "ОП-5", "num": "5", "name": "Транспортная", "addr": "г. Уфа, ул. Транспортная, д. 46/1", "g": "Север", "sup": "Абдеев А.Р", "area": "Уфа — Инорс", "d": "1", "lat": 54.7808892, "lon": 56.1210404, "tv": [], "st": "", "flags": [], "note": "", "approx": false, "approxNote": "", "visits": [{"by": "Пронин Артем Вадимович", "date": "08.09.2026"}]}, {"op": "ОП-64", "num": "64", "name": "Ферина", "addr": "г. Уфа, ул. Ферина, д. 8", "g": "Север", "sup": "Абдеев А.Р", "area": "Уфа — Инорс", "d": "1", "lat": 54.7845506, "lon": 56.1305065, "tv": [], "st": "", "flags": ["КМТ"], "note": "", "approx": false, "approxNote": "", "visits": [{"by": "Золотых Светлана Витальевна", "date": "08.09.2026"}]}, {"op": "ОП-169", "num": "169", "name": "Детская Библиотека", "addr": "г. Уфа, ул. Первомайская, д. 26.", "g": "Север", "sup": "Абдеев А.Р", "area": "Уфа — Черниковка", "d": "2", "lat": 54.8171163, "lon": 56.0755031, "tv": [], "st": "", "flags": ["КМЗ"], "note": "", "approx": false, "approxNote": "", "visits": [{"by": "Абдуллин Венер Фаритович", "date": "07.09.2026"}]}, {"op": "ОП-16", "num": "16", "name": "Кольцевая", "addr": "г. Уфа, ул. Кольцевая, д. 58", "g": "Север", "sup": "Абдеев А.Р", "area": "Уфа — Черниковка", "d": "2", "lat": 54.8218, "lon": 56.0804, "tv": [], "st": "", "flags": ["КМЗ"], "note": "", "approx": true, "approxNote": "д. 58 не размечен в OSM — интерполяция по нумерации ул. Кольцевой", "visits": [{"by": "Петров Дмитрий Юрьевич", "date": "07.09.2026"}]}, {"op": "ОП-34", "num": "34", "name": "Первомайская", "addr": "г. Уфа, ул. Первомайская, д. 40", "g": "Север", "sup": "Абдеев А.Р", "area": "Уфа — Черниковка", "d": "1", "lat": 54.8147482, "lon": 56.0837029, "tv": [], "st": "", "flags": ["КМТ", "КМЗ"], "note": "", "approx": false, "approxNote": "", "visits": [{"by": "Чусовитина Аделина Эриковна", "date": "07.09.2026"}]}, {"op": "ОП-45", "num": "45", "name": "Калининский", "addr": "г. Уфа, ул. Первомайская, д. 56", "g": "Север", "sup": "Абдеев А.Р", "area": "Уфа — Черниковка", "d": "1", "lat": 54.8119372, "lon": 56.0929104, "tv": [], "st": "", "flags": [], "note": "", "approx": false, "approxNote": "", "visits": [{"by": "Пронин Артем Вадимович", "date": "07.09.2026"}]}, {"op": "ОП-158", "num": "158", "name": "ДК УМПО", "addr": "г. Уфа, ул. Первомайская, д. 98", "g": "Север", "sup": "Абдеев А.Р", "area": "Уфа — Черниковка", "d": "2", "lat": 54.8068568, "lon": 56.1113795, "tv": [], "st": "", "flags": [], "note": "", "approx": false, "approxNote": "", "visits": [{"by": "Золотых Светлана Витальевна", "date": "07.09.2026"}]}, {"op": "ОП-131", "num": "131", "name": "Машиностроителей", "addr": "г. Уфа, ул. Машиностроителей, д. 19", "g": "Север", "sup": "Абдеев А.Р", "area": "Уфа — Черниковка", "d": "1", "lat": 54.8095518, "lon": 56.1155786, "tv": [], "st": "", "flags": [], "note": "", "approx": false, "approxNote": "", "visits": [{"by": "Чусовитина Аделина Эриковна", "date": "08.09.2026"}]}, {"op": "ОП-35", "num": "35", "name": "Юбилейный", "addr": "г. Уфа, ул. Кольцевая, д. 177", "g": "Север", "sup": "Абдеев А.Р", "area": "Уфа — Лопатино", "d": "1", "lat": 54.8117409, "lon": 56.1189579, "tv": [], "st": "", "flags": [], "note": "", "approx": false, "approxNote": "", "visits": [{"by": "Абдуллин Венер Фаритович", "date": "08.09.2026"}]}, {"op": "ОП-146", "num": "146", "name": "Ваз", "addr": "г. Уфа, ул. Коммунаров, д. 61", "g": "Север", "sup": "Абдеев А.Р", "area": "Уфа — Лопатино", "d": "2", "lat": 54.8165808, "lon": 56.1236362, "tv": [], "st": "", "flags": ["КМЗ"], "note": "", "approx": false, "approxNote": "", "visits": [{"by": "Хазиев Т.И.", "date": "08.09.2026"}]}, {"op": "ОП-6", "num": "6", "name": "Вологодская", "addr": "г. Уфа, ул. Вологодская, д. 38", "g": "Север", "sup": "Абдеев А.Р", "area": "Уфа — Лопатино", "d": "1", "lat": 54.8118159, "lon": 56.1278734, "tv": [], "st": "", "flags": [], "note": "", "approx": false, "approxNote": "", "visits": []}, {"op": "ОП-76", "num": "76", "name": "Вострецова", "addr": "г. Уфа, ул. Вострецова, д. 13", "g": "Север", "sup": "Абдеев А.Р", "area": "Уфа — Калининский р-н", "d": "1", "lat": 54.8042511, "lon": 56.1248564, "tv": [], "st": "", "flags": [], "note": "", "approx": false, "approxNote": "", "visits": [{"by": "Сакриев Алексей Владимирович", "date": "07.09.2026"}]}, {"op": "ОП-117", "num": "117", "name": "Шакша", "addr": "г. Уфа, ул. Гвардейская, д. 44", "g": "Север", "sup": "Абдеев А.Р", "area": "Уфа — Шакша", "d": "2", "lat": 54.7706363, "lon": 56.2287733, "tv": [], "st": "", "flags": ["КМТ"], "note": "", "approx": false, "approxNote": "", "visits": []}, {"op": "ОП-88", "num": "88", "name": "Иглино", "addr": "с. Иглино, ул. Горького, д. 41", "g": "Север", "sup": "Абдеев А.Р", "area": "с. Иглино", "d": "2", "lat": 54.826364, "lon": 56.4031737, "tv": [], "st": "", "flags": ["КМЗ +  (шкатулка)"], "note": "", "approx": false, "approxNote": "", "visits": []}, {"op": "ОП-167", "num": "167", "name": "Горького", "addr": "с. Иглино, ул. Горького, д.52.", "g": "Север", "sup": "Абдеев А.Р", "area": "с. Иглино", "d": "2", "lat": 54.8259755, "lon": 56.4040519, "tv": [], "st": "", "flags": [], "note": "", "approx": false, "approxNote": "", "visits": []}, {"op": "ОП-168", "num": "168", "name": "Альтернатива", "addr": "с. Иглино, ул. Ленина, д. 143", "g": "Север", "sup": "Абдеев А.Р", "area": "с. Иглино", "d": "2", "lat": 54.8375046, "lon": 56.4228601, "tv": [], "st": "", "flags": ["КМТ", "КМЗ"], "note": "", "approx": false, "approxNote": "", "visits": []}, {"op": "ОП-151", "num": "151", "name": "Корсо", "addr": "г.Уфа, Б.Бикбая, 33", "g": "ЮГ", "sup": "Камаров А.А.", "area": "Уфа — Сипайлово", "d": "6", "lat": 54.7650737, "lon": 56.0650532, "tv": [], "st": "", "flags": ["КМТ"], "note": "", "approx": false, "approxNote": "", "visits": []}, {"op": "ОП-15", "num": "15", "name": "Гагарина", "addr": "г.Уфа, Юрия Гагарина 31", "g": "ЮГ", "sup": "Камаров А.А.", "area": "Уфа — Сипайлово", "d": "6", "lat": 54.7674036, "lon": 56.0694337, "tv": [], "st": "", "flags": [], "note": "", "approx": false, "approxNote": "", "visits": []}, {"op": "ОП-133", "num": "133", "name": "Уфимка", "addr": "г.Уфа, ул. Юрия Гагарина, 39/3", "g": "ЮГ", "sup": "Камаров А.А.", "area": "Уфа — Сипайлово", "d": "6", "lat": 54.7699625, "lon": 56.0752301, "tv": [], "st": "", "flags": [], "note": "", "approx": false, "approxNote": "", "visits": []}, {"op": "ОП-159", "num": "159", "name": "Космос", "addr": "г.Уфа, Ю.Гагарина д.47", "g": "ЮГ", "sup": "Камаров А.А.", "area": "Уфа — Сипайлово", "d": "6", "lat": 54.7726481, "lon": 56.0774236, "tv": [], "st": "", "flags": [], "note": "", "approx": false, "approxNote": "", "visits": []}, {"op": "ОП-165", "num": "165", "name": "Бакалинская", "addr": "г.Уфа, Менделеева 137", "g": "ЮГ", "sup": "Камаров А.А.", "area": "Уфа — ул. Менделеева", "d": "6", "lat": 54.7134067, "lon": 55.9937297, "tv": [], "st": "", "flags": [], "note": "", "approx": false, "approxNote": "Менделеева, 137 — здание ТРК «Иремель» (раньше стоял POI внутри ТЦ)", "visits": [{"by": "Хазиев Т.И.", "date": "09.09.2026"}]}, {"op": "ОП-142", "num": "142", "name": "Иремель", "addr": "г.Уфа, ул. Менделеева, д.141", "g": "ЮГ", "sup": "Камаров А.А.", "area": "Уфа — ул. Менделеева", "d": "6", "lat": 54.7140593, "lon": 55.9976403, "tv": [], "st": "", "flags": ["КМТ"], "note": "", "approx": false, "approxNote": "Менделеева, 141 — здание в ряду нумерации 139 → 141/2 → 145 (раньше стоял объект «ХБК» с тем же номером)", "visits": [{"by": "Чусовитина Аделина Эриковна", "date": "09.09.2026"}]}, {"op": "ОП-53", "num": "53", "name": "Г. Горбатова", "addr": "г. Уфа, ул. Менделеева, д. 175/2", "g": "ЮГ", "sup": "Камаров А.А.", "area": "Уфа — ул. Менделеева", "d": "6", "lat": 54.7197171, "lon": 56.0065046, "tv": [], "st": "", "flags": [], "note": "", "approx": false, "approxNote": "", "visits": []}, {"op": "ОП-32", "num": "32", "name": "Новостройка", "addr": "г.Уфа, Менделеева,207", "g": "ЮГ", "sup": "Камаров А.А.", "area": "Уфа — ул. Менделеева", "d": "5", "lat": 54.7434831, "lon": 56.0257089, "tv": [], "st": "", "flags": ["КМЗ"], "note": "", "approx": false, "approxNote": "", "visits": []}, {"op": "ОП-157", "num": "157", "name": "Эвридей", "addr": "г.Уфа, ул. Менделеева, 229/1", "g": "ЮГ", "sup": "Камаров А.А.", "area": "Уфа — ул. Менделеева", "d": "6", "lat": 54.7532093, "lon": 56.0299325, "tv": [], "st": "", "flags": [], "note": "", "approx": false, "approxNote": "", "visits": []}, {"op": "ОП-144", "num": "144", "name": "Ай", "addr": "г. Уфа, ул. Айская, д. 70", "g": "ЮГ", "sup": "Камаров А.А.", "area": "Уфа — центр", "d": "5", "lat": 54.7323208, "lon": 55.9795912, "tv": [], "st": "", "flags": [], "note": "Увольнение с 01.09", "approx": false, "approxNote": "", "visits": []}, {"op": "ОП-170", "num": "170", "name": "Южный", "addr": "г.Уфа, ул.Степана Кувыкина 1г", "g": "ЮГ", "sup": "Камаров А.А.", "area": "Уфа — Зелёная Роща", "d": "6", "lat": 54.6983855, "lon": 55.9919153, "tv": [], "st": "", "flags": [], "note": "", "approx": false, "approxNote": "", "visits": []}, {"op": "ОП-143", "num": "143", "name": "Кувыкинский", "addr": "г. Уфа, ул. Степана Кувыкина, д.29", "g": "ЮГ", "sup": "Камаров А.А.", "area": "Уфа — Зелёная Роща", "d": "6", "lat": 54.7068183, "lon": 55.9974436, "tv": [], "st": "", "flags": [], "note": "", "approx": false, "approxNote": "", "visits": [{"by": "Золотых Светлана Витальевна", "date": "09.09.2026"}]}, {"op": "ОП-145", "num": "145", "name": "Софьи Перовской", "addr": "г. Уфа, ул Софьи Перовской, д. 23", "g": "ЮГ", "sup": "Камаров А.А.", "area": "Уфа — Зелёная Роща", "d": "6", "lat": 54.695807, "lon": 55.9980262, "tv": [], "st": "", "flags": [], "note": "", "approx": false, "approxNote": "", "visits": []}, {"op": "ОП-24", "num": "24", "name": "Демский", "addr": "г. Уфа, Ухтомского, д.16", "g": "ЮГ", "sup": "Камаров А.А.", "area": "Уфа — Дёма", "d": "5", "lat": 54.7060432, "lon": 55.8293813, "tv": [], "st": "", "flags": ["КМТ"], "note": "", "approx": false, "approxNote": "", "visits": []}, {"op": "ОП-17", "num": "17", "name": "Ухтомского", "addr": "г.Уфа, ул.Правды 20", "g": "ЮГ", "sup": "Камаров А.А.", "area": "Уфа — Дёма", "d": "5", "lat": 54.7031071, "lon": 55.8322671, "tv": [], "st": "", "flags": [], "note": "", "approx": false, "approxNote": "", "visits": []}, {"op": "ОП-127", "num": "127", "name": "Правды", "addr": "г. Уфа, ул. Правды, д.12", "g": "ЮГ", "sup": "Камаров А.А.", "area": "Уфа — Дёма", "d": "5", "lat": 54.7037474, "lon": 55.8368823, "tv": [], "st": "", "flags": [], "note": "", "approx": false, "approxNote": "", "visits": []}, {"op": "ОП-134", "num": "134", "name": "Яркий", "addr": "г. Уфа, ул. Е.Столярова, д.2", "g": "ЮГ", "sup": "Камаров А.А.", "area": "Уфа — Дёма", "d": "5", "lat": 54.6986524, "lon": 55.858021, "tv": [], "st": "", "flags": [], "note": "", "approx": false, "approxNote": "", "visits": []}, {"op": "ОП-153", "num": "153", "name": "Зубово", "addr": "Уфимский район, с. Зубово, ул. Серебряная, д.91", "g": "ЮГ", "sup": "Камаров А.А.", "area": "Уфимский район", "d": "5", "lat": 54.6325474, "lon": 55.9195705, "tv": [], "st": "", "flags": ["КМТ"], "note": "", "approx": false, "approxNote": "", "visits": []}, {"op": "ОП-135", "num": "135", "name": "Булгаково", "addr": "с. Булгаково, ул.Школьная, 41 к2", "g": "ЮГ", "sup": "Камаров А.А.", "area": "Уфимский район", "d": "5", "lat": 54.4195904, "lon": 56.0301995, "tv": [], "st": "", "flags": ["КМТ"], "note": "", "approx": true, "approxNote": "д. 41 к2 не размечен — якорь: ул. Школьная, 4 в с. Булгаково", "visits": []}, {"op": "ОП-19", "num": "19", "name": "Чишмы", "addr": "рп.Чишмы, Проспект Дружбы, 6/1", "g": "ЮГ", "sup": "Камаров А.А.", "area": "Чишминский район", "d": "5", "lat": 54.5895403, "lon": 55.3834519, "tv": [], "st": "", "flags": ["КМЗ"], "note": "", "approx": false, "approxNote": "", "visits": []}, {"op": "ОП-173", "num": "173", "name": "Светофор", "addr": "п.г.т. Чишмы, ул. Шоссейная, д.11", "g": "ЮГ", "sup": "Камаров А.А.", "area": "Чишминский район", "d": "5", "lat": 54.5902, "lon": 55.3932, "tv": [], "st": "", "flags": ["КМТ", "КМЗ"], "note": "", "approx": true, "approxNote": "д. 11 не размечен — точка между домами 9 и 10 по ул. Шоссейной", "visits": []}];
+var META = {"groups": [{"name": "Север", "sup": "Абдеев А.Р"}, {"name": "ЮГ", "sup": "Камаров А.А."}], "divisions": ["1", "2", "5", "6"]};
+
+var VISITED = "#d92b2b";   // объезд пройден — красный
+var PENDING = "#2f6fed";   // ещё не были — синий
+function colorOf(p){ return p.visits.length ? VISITED : PENDING; }
+function esc(s){
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+var map = L.map("map", {scrollWheelZoom:true});
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom:19,
+  attribution:'&copy; участники <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+}).addTo(map);
+
+// ─── чекбоксы групп и дивизионов строим по данным ───
+function addBox(rowId, attr, value, label){
+  var l = document.createElement("label");
+  l.innerHTML = '<input type="checkbox" ' + attr + '="' + esc(value) + '" checked>' + esc(label);
+  document.getElementById(rowId).appendChild(l);
+}
+META.groups.forEach(function(g){ addBox("rowGroups", "data-g", g.name, g.name + " — " + g.sup); });
+META.divisions.forEach(function(d){ addBox("rowDiv", "data-d", d, d); });
+
+// ─── маркеры ───
+POINTS.forEach(function(p){
+  var was = p.visits.length > 0;
+  var icon = L.divIcon({
+    className:"", iconSize:[38,22], iconAnchor:[19,22], popupAnchor:[0,-20],
+    html:'<div class="pin' + (was ? " v" : "") + (p.approx ? " q" : "") +
+         '" style="background:' + colorOf(p) + '">' + (was ? "✓ " : "") + esc(p.num) + "</div>"
+  });
+  var m = L.marker([p.lat,p.lon], {icon:icon});
+  var visitHtml = p.visits.map(function(v){
+    return '<div class="visited">✓ Объезд ' + esc(v.date) + "<i>" + esc(v.by) + "</i></div>";
+  }).join("");
+  m.bindPopup(
+    "<b>" + esc(p.op) + (p.name ? " «" + esc(p.name) + "»" : "") + "</b>" +
+    '<div class="a">' + esc(p.addr) + "</div>" +
+    visitHtml +
+    "<dl>" +
+      "<dt>Группа</dt><dd>" + esc(p.g) + (p.sup ? " · " + esc(p.sup) : "") + "</dd>" +
+      "<dt>Дивизион</dt><dd>" + esc(p.d) + "</dd>" +
+      (p.tv.length ? "<dt>Товароведы</dt><dd>" + p.tv.map(esc).join("<br>") + "</dd>" : "") +
+      (p.st ? "<dt>Роль</dt><dd>" + esc(p.st) + "</dd>" : "") +
+      (p.flags.length ? "<dt>Отметки</dt><dd>" + p.flags.map(esc).join(", ") + "</dd>" : "") +
+      (p.note ? "<dt>Комментарий</dt><dd>" + esc(p.note) + "</dd>" : "") +
+      "<dt>Координаты</dt><dd>" + p.lat.toFixed(6) + ", " + p.lon.toFixed(6) +
+        (p.approx ? '<br><span style="color:#b06000">⚠ приблизительные' +
+          (p.approxNote ? ": " + esc(p.approxNote) : "") + "</span>" : "") + "</dd>" +
+    "</dl>"
+  );
+  p._m = m;
+});
+
+// ─── список слева ───
+var list = document.getElementById("list");
+var lastG = null, lastArea = null;
+POINTS.forEach(function(p){
+  if (p.g !== lastG){
+    var gh = document.createElement("div");
+    gh.className = "ghdr"; gh.setAttribute("data-g", p.g);
+    gh.innerHTML = "Группа «" + esc(p.g) + "»" + (p.sup ? " <small>· " + esc(p.sup) + "</small>" : "");
+    list.appendChild(gh); lastG = p.g; lastArea = null;
+  }
+  if (p.area !== lastArea){
+    var h = document.createElement("div");
+    h.className = "grp"; h.textContent = p.area;
+    list.appendChild(h); lastArea = p.area;
+  }
+  var tags = [];
+  p.visits.forEach(function(v){
+    tags.push('<span class="tag ok">✓ ' + esc(v.date) + " · " + esc(v.by) + "</span>");
+  });
+  p.flags.forEach(function(f){ tags.push('<span class="tag">' + esc(f) + "</span>"); });
+  if (p.st) tags.push('<span class="tag">ст. товаровед</span>');
+  if (p.approx) tags.push('<span class="tag warn">коорд. прибл.</span>');
+
+  var b = document.createElement("button");
+  b.className = "item";
+  b.setAttribute("data-op", p.op);
+  b.innerHTML =
+    '<span class="op' + (p.visits.length ? " v" : "") + '" style="background:' +
+      colorOf(p) + '">' + esc(p.op) + "</span>" +
+    '<span><span class="name">' + esc(p.name) + "</span><br>" +
+    '<span class="addr">' + esc(p.addr) + "</span>" +
+    (tags.length ? '<span class="note">' + tags.join("") + "</span>" : "") +
+    "</span>";
+  b.onclick = function(){
+    document.querySelectorAll(".item").forEach(function(e){ e.classList.remove("on"); });
+    b.classList.add("on");
+    if (!map.hasLayer(p._m)) return;
+    map.flyTo([p.lat,p.lon], 17, {duration:0.6});
+    p._m.openPopup();
+  };
+  list.appendChild(b);
+});
+
+// ─── фильтры ───
+function applyFilter(){
+  var gOn = {}, dOn = {};
+  document.querySelectorAll("input[data-g]").forEach(function(i){ gOn[i.dataset.g] = i.checked; });
+  document.querySelectorAll("input[data-d]").forEach(function(i){ dOn[i.dataset.d] = i.checked; });
+  var onlyV = document.getElementById("onlyVisited").checked;
+
+  var shown = 0;
+  POINTS.forEach(function(p){
+    var vis = gOn[p.g] && dOn[p.d] && (!onlyV || p.visits.length > 0);
+    if (vis){ shown++; if (!map.hasLayer(p._m)) p._m.addTo(map); }
+    else if (map.hasLayer(p._m)) map.removeLayer(p._m);
+    var btn = document.querySelector('.item[data-op="' + p.op + '"]');
+    if (btn) btn.style.display = vis ? "" : "none";
+  });
+
+  document.querySelectorAll(".ghdr").forEach(function(h){
+    h.style.display = gOn[h.getAttribute("data-g")] ? "" : "none";
+  });
+  document.querySelectorAll(".grp").forEach(function(h){
+    var any = false, n = h.nextElementSibling;
+    while (n && !n.classList.contains("grp") && !n.classList.contains("ghdr")){
+      if (n.style.display !== "none") any = true;
+      n = n.nextElementSibling;
+    }
+    h.style.display = any ? "" : "none";
+  });
+  document.getElementById("empty").style.display = shown ? "none" : "block";
+}
+document.querySelectorAll("#side input[type=checkbox]").forEach(function(i){
+  i.addEventListener("change", applyFilter);
+});
+
+// ─── счётчик ───
+function done(a){ return a.filter(function(p){ return p.visits.length; }).length; }
+var byGroup = META.groups.map(function(g){
+  var a = POINTS.filter(function(p){ return p.g === g.name; });
+  return esc(g.name) + " " + done(a) + "/" + a.length;
+}).join(" · ");
+document.getElementById("count").innerHTML =
+  "✓ Объезд пройден: " + done(POINTS) + " из " + POINTS.length +
+  " <span>· " + byGroup + "</span>";
+
+applyFilter();
+map.fitBounds(L.latLngBounds(POINTS.map(function(p){ return [p.lat,p.lon]; })), {padding:[45,45]});
+</script>
+</body>
+</html>
